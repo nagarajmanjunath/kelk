@@ -9,3 +9,4 @@ description = "Kelk-lib is the standard librry for wasm based contracts in Zarb 
 
 
 [dependencies]
+kelk-env = { path = "../env" }

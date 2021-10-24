@@ -1,4 +1,4 @@
-//! This crate provide APIs for interacting with Zarb blockchain.
+//! Kelk-env is a Low-level interface for interacting with Tanour (Wasm executor) in Zarb blockchain.
 //!
 #![no_std]
 #![deny(
