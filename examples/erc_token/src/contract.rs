@@ -5,7 +5,7 @@ use kelk_lib::alloc::vec::Vec;
 use kelk_lib::collections::bst::tree::StorageBST;
 
 fn transfer(ctx: Context, from: Vec<u8>, to: Vec<u8>, amount: i64) -> Result<(), CalcError> {
-    let bst = StorageBST::lazy_load(ctx.api, 4);
+    let bst :StorageBST<Vec<u8>, Vec<u8>> = StorageBST::lazy_load(ctx.api, 4).unwrap(); // FIXME: no unwrap
     todo!()
 }
 
