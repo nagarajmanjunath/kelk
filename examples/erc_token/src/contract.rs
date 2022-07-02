@@ -5,8 +5,23 @@ use kelk_lib::alloc::vec::Vec;
 use kelk_lib::collections::bst::tree::StorageBST;
 
 fn transfer(ctx: Context, from: Vec<u8>, to: Vec<u8>, amount: i64) -> Result<(), CalcError> {
-    let bst :StorageBST<Vec<u8>, Vec<u8>> = StorageBST::lazy_load(ctx.api, 4).unwrap(); // FIXME: no unwrap
-    todo!()
+    let mut bst: StorageBST<Vec<u8>, i64> = StorageBST::lazy_load(ctx.api, 0).unwrap(); // FIXME: no unwrap
+    let sender_balance_option = bst.find(&from).unwrap();
+    match sender_balance_option {
+        Some(tx_balance) => {
+            if tx_balance < amount {
+                return Err(CalcError::InsufficentAmount);
+            }
+            match bst.find(&to).unwrap() {
+                Some(rx_blance) => bst.insert(to, rx_blance + amount).unwrap(),
+                None => bst.insert(to, amount).unwrap(),
+            };
+            bst.insert(from, tx_balance - amount)
+        }
+        None => return Err(CalcError::InsufficentAmount),
+    };
+
+    Ok(())
 }
 
 fn query_result(ctx: Context) -> Result<i32, CalcError> {

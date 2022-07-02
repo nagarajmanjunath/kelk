@@ -5,6 +5,5 @@ pub enum CalcError {
     #[n(0)]
     KelkError,
     #[n(1)]
-    DivByZero,
+    InsufficentAmount,
 }
-
