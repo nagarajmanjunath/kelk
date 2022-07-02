@@ -6,9 +6,9 @@ pub enum ProcMsg {
     #[n(4)]
     Transfer {
         #[n(0)]
-        from: Vec<u8>,
+        from: [u8; 4],
         #[n(1)]
-        to: Vec<u8>,
+        to: [u8; 4],
         #[n(2)]
         amount: i64,
     },
