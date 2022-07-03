@@ -2,12 +2,13 @@
 //! Read and writes from contract's storage. Therefore it's permanently store inside contract's storage.
 
 use super::error::Error;
-use crate::collections::bst::header::Header;
-use crate::collections::bst::node::Node;
+use super::header::Header;
+use super::node::Node;
 use crate::storage::{sread_struct, swrite_struct, Storage};
 use core::marker::PhantomData;
 use core::mem::size_of;
 use core::result::Result;
+
 
 /// The instance of Storage Binary Search Tree
 pub struct StorageBST<'a, K, V>
@@ -26,7 +27,7 @@ where
     K: Sized + Ord,
     V: Sized,
 {
-    /// creates ans store a new instance of Storage Binary Search Tree at the given offset
+    /// creates and store a new instance of Storage Binary Search Tree at the given offset
     pub fn create(storage: &'a dyn Storage, offset: u32, capacity: u32) -> Result<Self, Error> {
         let header = Header::new::<K, V>(capacity);
         swrite_struct(storage, offset, &header)?;
@@ -130,7 +131,10 @@ where
         }
 
         let mut offset = self.offset + size_of::<Header>() as u32;
+            //    panic!("{} {}", offset, size_of::<Node<K, V>>());
         let mut node = sread_struct::<Node<K, V>>(self.storage, offset)?;
+
+
 
         loop {
             if node.key.eq(key) {
@@ -175,11 +179,11 @@ mod tests {
     #[test]
     fn test_header() {
         let storage = mock_storage(1024);
-        StorageBST::<i32, i32>::create(&storage, 512, 16).unwrap();
+        StorageBST::<i32, i64>::create(&storage, 512, 16).unwrap();
         let header = sread_struct::<Header>(&storage, 512).unwrap();
         assert_eq!(header.boom, 0xb3000000);
         assert_eq!(header.key_len, 4);
-        assert_eq!(header.value_len, 4);
+        assert_eq!(header.value_len, 8);
         assert_eq!(header.size, 0);
         assert_eq!(header.capacity, 16);
     }
@@ -223,12 +227,12 @@ mod tests {
     #[test]
     fn test_capacity() {
         let storage = mock_storage(1024);
-        let mut bst = StorageBST::<i32, i32>::create(&storage, 0, 4).unwrap();
+        let mut bst = StorageBST::<i32, i16>::create(&storage, 0, 4).unwrap();
 
         assert_eq!(None, bst.insert(1, 1).unwrap());
         assert_eq!(None, bst.insert(2, 2).unwrap());
         assert_eq!(None, bst.insert(3, 3).unwrap());
-        assert_eq!(None, bst.insert(4, 44).unwrap());
+        assert_eq!(None, bst.insert(4, 4).unwrap());
         assert!(bst.insert(5, 5).is_err());
     }
 }

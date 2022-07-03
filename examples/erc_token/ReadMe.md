@@ -1,6 +1,6 @@
 ## Calculator contract
 
-A simple calculator contractor to do basic calculation with memory storage.
+A simple erc 20 token contractor to do basic deployment with memory storage.
 
 
 ## How to compile
