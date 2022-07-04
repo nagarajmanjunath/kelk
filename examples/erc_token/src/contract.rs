@@ -1,11 +1,44 @@
 use crate::error::TokenError;
 use crate::message::{ProcMsg, QueryMsg, QueryRsp};
 use kelk_env::context::Context;
-use kelk_lib::alloc::vec::Vec;
 use kelk_lib::collections::bst::tree::StorageBST;
 
 fn transfer(ctx: Context, from: [u8; 4], to: [u8; 4], amount: i64) -> Result<(), TokenError> {
-    let mut bst: StorageBST<[u8; 4], i64> = StorageBST::lazy_load(ctx.api, 0).unwrap(); // FIXME: no unwrap
+    let mut bst: StorageBST<[u8; 4], i64> = StorageBST::lazy_load(ctx.storage, 0).unwrap(); // FIXME: no unwrap
+    let tx_balance = match bst.find(&from).unwrap() {
+        Some(balance) => balance,
+        None => 0,
+    };
+
+    let rx_balance = match bst.find(&to).unwrap() {
+        Some(balance) => balance,
+        None => 0,
+    };
+
+    if tx_balance < amount {
+        return Err(TokenError::InsufficientAmount);
+    }
+
+    bst.insert(from, tx_balance - amount).unwrap();
+    bst.insert(to, rx_balance + amount).unwrap();
+
+    Ok(())
+}
+
+fn contract_name(ctx: Context, from: [u8; 4], name: Vec<u8>) -> Result<(), TokenError> {
+    let mut bst: StorageBST<[u8; 4], Vec<u8>> = StorageBST::lazy_load(ctx.storage, 0).unwrap();
+    if name.len() > 64 {
+        let ch = name[0..64].to_vec();
+        bst.insert(from, ch).unwrap();
+    } else {
+        bst.insert(from, name.clone()).unwrap();
+    }
+
+    Ok(())
+}
+
+fn transfer_from(ctx: Context, from: [u8; 4], to: [u8; 4], amount: i64) -> Result<(), TokenError> {
+    let mut bst: StorageBST<[u8; 4], i64> = StorageBST::lazy_load(ctx.storage, 0).unwrap(); // FIXME: no unwrap
     let tx_balance = match bst.find(&from).unwrap() {
         Some(balance) => balance,
         None => 0,
@@ -27,7 +60,7 @@ fn transfer(ctx: Context, from: [u8; 4], to: [u8; 4], amount: i64) -> Result<(),
 }
 
 fn query_result(ctx: Context) -> Result<i32, TokenError> {
-    ctx.api.sread_i32(0).map_err(|_| TokenError::KelkError)
+    ctx.storage.sread_i32(0).map_err(|_| TokenError::KelkError)
 }
 
 #[cfg(target_arch = "wasm32")]

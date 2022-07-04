@@ -1,4 +1,3 @@
-use kelk_lib::alloc::vec::Vec;
 use minicbor::{Decode, Encode};
 
 #[derive(Clone, Debug, Encode, Decode)]
