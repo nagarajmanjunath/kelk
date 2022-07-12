@@ -1,32 +1,36 @@
-use crate::error::TokenError;
+use crate::error::Error;
 use crate::message::{Address, InstansiteMsg, ProcMsg, QueryMsg, QueryRsp};
-use kelk_env::context::Context;
-use kelk_env::storage::{sread_struct, swrite_struct};
-use kelk_lib::collections::bst::tree::StorageBST;
+use kelk::context::Context;
+use kelk::kelk_derive;
+use kelk::storage::collections::bst::StorageBST;
 
-fn transfer(ctx: Context, to: Address, amount: i64) -> Result<(), TokenError> {
-    let from = sread_struct::<Address>(ctx.storage, 0)?;
+fn transfer(ctx: Context, to: Address, amount: i64) -> Result<(), Error> {
+    let from: Address = ctx.storage.read_struct(0).unwrap();
     transfer_from(ctx, from, to, amount)
 }
 
-fn name(ctx: Context) -> Result<String, TokenError> {
-    let res = ctx.storage.sread(5, 64).unwrap();
-    let name = core::str::from_utf8(&res).expect("Found invalid UTF-8");
-    Ok(name.to_string())
+fn name(ctx: Context) -> Result<String, Error> {
+    Ok(ctx.storage.read_string(5, 64).unwrap())
 }
 
-fn symbol(ctx: Context) -> Result<String, TokenError> {
-    let res = ctx.storage.sread(69, 76).unwrap();
-    let symbol = core::str::from_utf8(&res).expect("Found invalid UTF-8");
-    Ok(symbol.to_string())
+fn symbol(ctx: Context) -> Result<String, Error> {
+    Ok(ctx.storage.read_string(69, 76).unwrap())
 }
 
-fn balance(ctx: Context) -> Result<i64, TokenError> {
-    let mut bst: StorageBST<Address, i64> = StorageBST::lazy_load(ctx.storage, 128).unwrap();
-    Ok(bst)
+fn total_supply(ctx: Context) -> Result<i64, Error> {
+    Ok(ctx.storage.read_i64(77).unwrap())
 }
 
-fn transfer_from(ctx: Context, from: Address, to: Address, amount: i64) -> Result<(), TokenError> {
+fn balance(ctx: Context, address: Address) -> Result<i64, Error> {
+    let bst: StorageBST<Address, i64> = StorageBST::lazy_load(ctx.storage, 128).unwrap();
+    let balance = match bst.find(&address).unwrap() {
+        Some(balance) => balance,
+        None => 0,
+    };
+    Ok(balance)
+}
+
+fn transfer_from(ctx: Context, from: Address, to: Address, amount: i64) -> Result<(), Error> {
     let mut bst: StorageBST<Address, i64> = StorageBST::lazy_load(ctx.storage, 128).unwrap(); // FIXME: no unwrap
     let tx_balance = match bst.find(&from).unwrap() {
         Some(balance) => balance,
@@ -39,7 +43,7 @@ fn transfer_from(ctx: Context, from: Address, to: Address, amount: i64) -> Resul
     };
 
     if tx_balance < amount {
-        return Err(TokenError::InsufficientAmount);
+        return Err(Error::InsufficientAmount);
     }
 
     bst.insert(from, tx_balance - amount).unwrap();
@@ -48,37 +52,14 @@ fn transfer_from(ctx: Context, from: Address, to: Address, amount: i64) -> Resul
     Ok(())
 }
 
-#[cfg(target_arch = "wasm32")]
-mod __wasm_export_process_msg {
-    #[no_mangle]
-    extern "C" fn process_msg(msg_ptr: u64) -> u64 {
-        kelk_env::do_process_msg(&super::process_msg, msg_ptr)
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-mod __wasm_export_instantiate {
-    #[no_mangle]
-    extern "C" fn instantiate(msg_ptr: u64) -> u64 {
-        kelk_env::do_instantiate(&super::instantiate, msg_ptr)
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-mod __wasm_export_query {
-    #[no_mangle]
-    extern "C" fn query(msg_ptr: u64) -> u64 {
-        kelk_env::do_query(&super::query, msg_ptr)
-    }
-}
 /*
-process_msg executes the contract associated with the addr with the given input as
+process executes the contract associated with the addr with the given input as
 parameters. It also handles any necessary value transfer required and takes
 the necessary steps to create accounts and reverses the state in case of an
 execution error or failed value transfer.
-#[kelk_derive(process_msg)]
 */
-pub fn process_msg(ctx: Context, msg: ProcMsg) -> Result<(), TokenError> {
+#[kelk_derive(process)]
+pub fn process(ctx: Context, msg: ProcMsg) -> Result<(), Error> {
     match msg {
         ProcMsg::Transfer { to, amount } => transfer(ctx, to, amount),
         ProcMsg::TransferFrom { from, to, amount } => transfer_from(ctx, from, to, amount),
@@ -87,19 +68,19 @@ pub fn process_msg(ctx: Context, msg: ProcMsg) -> Result<(), TokenError> {
 
 /*
 instantiate creates a new contract and deployment code.
-#[kelk_derive(instantiate)]
 */
-pub fn instantiate(ctx: Context, msg: InstansiteMsg) -> Result<(), TokenError> {
+#[kelk_derive(instantiate)]
+pub fn instantiate(ctx: Context, msg: InstansiteMsg) -> Result<(), Error> {
     if msg.name.len() > 64 {
-        return Err(TokenError::InvalidMsg);
+        return Err(Error::InvalidMsg);
     }
     if msg.symbol.len() > 8 {
-        return Err(TokenError::InvalidMsg);
+        return Err(Error::InvalidMsg);
     }
-    swrite_struct::<Address>(ctx.storage, 0, &msg.owner).unwrap();
-    ctx.storage.swrite(5, msg.name.as_bytes()).unwrap();
-    ctx.storage.swrite(69, msg.symbol.as_bytes()).unwrap();
-    ctx.storage.swrite_i64(77, msg.total_supply).unwrap();
+    ctx.storage.write_struct(0, &msg.owner).unwrap();
+    ctx.storage.write_string(5, &msg.name, 64).unwrap();
+    ctx.storage.write_string(69, &msg.symbol, 4).unwrap();
+    ctx.storage.write_i64(77, msg.total_supply).unwrap();
     let mut bst: StorageBST<Address, i64> = StorageBST::create(ctx.storage, 128, 1000).unwrap();
     // FIXME unwrap()
     bst.insert(msg.owner, msg.total_supply).unwrap();
@@ -108,13 +89,15 @@ pub fn instantiate(ctx: Context, msg: InstansiteMsg) -> Result<(), TokenError> {
 /*
 query executes the contract associated with the addr with the given input
 as parameters while disallowing any modifications to the state during the call.
-#[kelk_derive(query)]
 */
-pub fn query(ctx: Context, msg: QueryMsg) -> Result<QueryRsp, TokenError> {
+#[kelk_derive(query)]
+pub fn query(ctx: Context, msg: QueryMsg) -> Result<QueryRsp, Error> {
     let res = match msg {
         QueryMsg::Name => QueryRsp::NameRsp { res: name(ctx)? },
         QueryMsg::Symbol => QueryRsp::SymbolRsp { res: symbol(ctx)? },
-        QueryMsg::Balance => QueryRsp::BalanceRsp { res: balance(ctx)? },
+        QueryMsg::Balance { addr } => QueryRsp::BalanceRsp {
+            res: balance(ctx, addr)?,
+        },
     };
 
     Ok(res)

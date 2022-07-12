@@ -40,7 +40,10 @@ pub enum QueryMsg {
     #[n(1)]
     Symbol,
     #[n(2)]
-    Balance,
+    Balance {
+        #[n(0)]
+        addr: Address,
+    },
 }
 
 #[derive(Clone, Debug, Encode, Decode)]

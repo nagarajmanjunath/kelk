@@ -1,7 +1,7 @@
 use super::*;
-use kelk_env::context::Context;
-use kelk_env::mock::mock_context;
-use kelk_lib::collections::bst::tree::StorageBST;
+use kelk::context::mock_context;
+use kelk::context::Context;
+
 
 fn setup(ctx: Context) {
     let msg = InstansiteMsg {
@@ -17,9 +17,10 @@ fn setup(ctx: Context) {
 fn test_instantiate() {
     let ctx = mock_context(1024 * 1024);
     setup(ctx.as_ref());
-    // assert_eq!(name(ctx.as_ref()).unwrap(), "test-erc20".to_string());
+    assert_eq!(name(ctx.as_ref()).unwrap(), "test-erc20".to_string());
     assert_eq!(symbol(ctx.as_ref()).unwrap(), "@".to_string());
-    assert_eq!(balance(ctx.as_ref()).unwrap(), 2000);
+    assert_eq!(balance(ctx.as_ref(), [0; 4]).unwrap(), 2000);
+    assert_eq!(total_supply(ctx.as_ref()).unwrap(), 2000);
 }
 
 #[test]
@@ -31,4 +32,6 @@ fn test_transfer() {
     assert!(transfer(ctx.as_ref(), addr_1, 10).is_ok());
     assert!(transfer_from(ctx.as_ref(), addr_1, addr_2, 20).is_err());
     assert!(transfer_from(ctx.as_ref(), addr_1, addr_2, 5).is_ok());
+    assert_eq!(balance(ctx.as_ref(), addr_1).unwrap(), 5);
+    assert_eq!(balance(ctx.as_ref(), addr_2).unwrap(), 5);
 }

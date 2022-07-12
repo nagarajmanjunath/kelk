@@ -1,7 +1,7 @@
 use minicbor::Encode;
 
 #[derive(Clone, Debug, Encode)]
-pub enum TokenError {
+pub enum Error {
     #[n(0)]
     KelkError(#[n(0)] i32),
     #[n(1)]
@@ -10,8 +10,8 @@ pub enum TokenError {
     InsufficientAmount,
 }
 
-impl From<kelk_env::error::HostError> for TokenError {
-    fn from(error: kelk_env::error::HostError) -> Self {
-        TokenError::KelkError(error.code)
-    }
-}
+// impl From<kelk::error::Error> for Error {
+//     fn from(error: kelk::error::Error) -> Self {
+//         Error::KelkError(error.code)
+//     }
+// }
