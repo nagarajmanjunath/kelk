@@ -130,7 +130,7 @@ where
         }
 
         let mut offset = self.offset + size_of::<Header>() as u32;
-        let mut node = sread_struct::<Node<K, V>>(self.storage, offset)?;
+        let mut node: Node<K, V> = self.storage.read_struct(offset)?;
 
         loop {
             if node.key.eq(key) {
