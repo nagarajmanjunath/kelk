@@ -18,6 +18,8 @@ fn test_instantiate() {
     let ctx = mock_context(1024 * 1024);
     setup(ctx.as_ref());
     // assert_eq!(name(ctx.as_ref()).unwrap(), "test-erc20".to_string());
+    assert_eq!(symbol(ctx.as_ref()).unwrap(), "@".to_string());
+    assert_eq!(balance(ctx.as_ref()).unwrap(), 2000);
 }
 
 #[test]
@@ -30,30 +32,3 @@ fn test_transfer() {
     assert!(transfer_from(ctx.as_ref(), addr_1, addr_2, 20).is_err());
     assert!(transfer_from(ctx.as_ref(), addr_1, addr_2, 5).is_ok());
 }
-
-// #[test]
-// fn test_contract_name_with_64_charater() {
-//     let ctx = mock_context(1024 * 1024);
-//     let _bst: StorageBST<[u8; 4], Vec<u8>> =
-//         StorageBST::create(ctx.as_ref().storage, 0, 1024).unwrap();
-//     let from_address = [1; 4];
-//     let name = String::from("rpstlnmmhwrngtfsvtzsvbichuhkkvmwdyggxltvxbjykgkjhgodelwehgodxjos")
-//         .as_bytes()
-//         .to_vec();
-//     let response_1 = contract_name(ctx.as_ref(), from_address, name);
-//     assert!(response_1.is_ok());
-// }
-
-// #[test]
-// fn test_contract_name_with_greater_64_charater() {
-//     let ctx = mock_context(1024 * 1024);
-//     let _bst: StorageBST<[u8; 4], Vec<u8>> =
-//         StorageBST::create(ctx.as_ref().storage, 0, 1024).unwrap();
-//     let from_address = [1; 4];
-//     let name =
-//         String::from("rpstlnmmhwrngtfsvtzsvbichuhkkvmwdyggxltvxbjykgkjhgodelwehgodxjos-----")
-//             .as_bytes()
-//             .to_vec();
-//     let response_1 = contract_name(ctx.as_ref(), from_address, name);
-//     assert!(response_1.is_ok());
-// }

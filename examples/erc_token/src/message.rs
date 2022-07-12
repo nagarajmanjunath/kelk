@@ -37,10 +37,10 @@ pub struct InstansiteMsg {
 pub enum QueryMsg {
     #[n(0)]
     Name,
-    // #[n(1)]
-    // Symbol,
-    // #[n(2)]
-    // Balance,
+    #[n(1)]
+    Symbol,
+    #[n(2)]
+    Balance,
 }
 
 #[derive(Clone, Debug, Encode, Decode)]
@@ -49,5 +49,15 @@ pub enum QueryRsp {
     NameRsp {
         #[n(0)]
         res: String,
+    },
+    #[n(1)]
+    SymbolRsp {
+        #[n(1)]
+        res: String,
+    },
+    #[n(2)]
+    BalanceRsp {
+        #[n(2)]
+        res: i64,
     },
 }

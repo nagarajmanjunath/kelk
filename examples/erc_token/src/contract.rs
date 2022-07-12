@@ -21,6 +21,11 @@ fn symbol(ctx: Context) -> Result<String, TokenError> {
     Ok(symbol.to_string())
 }
 
+fn balance(ctx: Context) -> Result<i64, TokenError> {
+    let mut bst: StorageBST<Address, i64> = StorageBST::lazy_load(ctx.storage, 128).unwrap();
+    Ok(bst)
+}
+
 fn transfer_from(ctx: Context, from: Address, to: Address, amount: i64) -> Result<(), TokenError> {
     let mut bst: StorageBST<Address, i64> = StorageBST::lazy_load(ctx.storage, 128).unwrap(); // FIXME: no unwrap
     let tx_balance = match bst.find(&from).unwrap() {
@@ -66,8 +71,13 @@ mod __wasm_export_query {
         kelk_env::do_query(&super::query, msg_ptr)
     }
 }
-
-// #[kelk_derive(process_msg)]
+/*
+process_msg executes the contract associated with the addr with the given input as
+parameters. It also handles any necessary value transfer required and takes
+the necessary steps to create accounts and reverses the state in case of an
+execution error or failed value transfer.
+#[kelk_derive(process_msg)]
+*/
 pub fn process_msg(ctx: Context, msg: ProcMsg) -> Result<(), TokenError> {
     match msg {
         ProcMsg::Transfer { to, amount } => transfer(ctx, to, amount),
@@ -75,7 +85,10 @@ pub fn process_msg(ctx: Context, msg: ProcMsg) -> Result<(), TokenError> {
     }
 }
 
-// #[kelk_derive(instantiate)]
+/*
+instantiate creates a new contract and deployment code.
+#[kelk_derive(instantiate)]
+*/
 pub fn instantiate(ctx: Context, msg: InstansiteMsg) -> Result<(), TokenError> {
     if msg.name.len() > 64 {
         return Err(TokenError::InvalidMsg);
@@ -92,10 +105,16 @@ pub fn instantiate(ctx: Context, msg: InstansiteMsg) -> Result<(), TokenError> {
     bst.insert(msg.owner, msg.total_supply).unwrap();
     Ok(())
 }
-// #[kelk_derive(query)]
-pub fn query_result(ctx: Context, msg: QueryMsg) -> Result<QueryRsp, TokenError> {
+/*
+query executes the contract associated with the addr with the given input
+as parameters while disallowing any modifications to the state during the call.
+#[kelk_derive(query)]
+*/
+pub fn query(ctx: Context, msg: QueryMsg) -> Result<QueryRsp, TokenError> {
     let res = match msg {
         QueryMsg::Name => QueryRsp::NameRsp { res: name(ctx)? },
+        QueryMsg::Symbol => QueryRsp::SymbolRsp { res: symbol(ctx)? },
+        QueryMsg::Balance => QueryRsp::BalanceRsp { res: balance(ctx)? },
     };
 
     Ok(res)
