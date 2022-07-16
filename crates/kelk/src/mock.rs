@@ -6,15 +6,15 @@ use crate::{
     storage::{mock::MockStorage, Storage},
 };
 
-/// `MockedContext` owns the mocked instances.
-pub struct MockedContext {
+/// `MockContext` owns the mocked instances.
+pub struct MockContext {
     /// The instance of Storage
     pub storage: Storage,
     /// The instance of Blockchain
     pub blockchain: Blockchain,
 }
 
-impl MockedContext {
+impl MockContext {
     /// returns the context as reference
     pub fn as_ref(&self) -> Context<'_> {
         Context {
@@ -43,10 +43,10 @@ impl MockedContext {
 }
 
 /// mocks the context for testing
-pub fn mock_context(storage_size: usize) -> MockedContext {
+pub fn mock_context(storage_size: usize) -> MockContext {
     use crate::{blockchain::mock::mock_blockchain, storage::mock::mock_storage};
 
-    MockedContext {
+    MockContext {
         blockchain: mock_blockchain(),
         storage: mock_storage(storage_size),
     }

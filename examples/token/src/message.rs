@@ -1,6 +1,5 @@
+use kelk::blockchain::address::Address;
 use minicbor::{Decode, Encode};
-
-pub type Address = [u8; 4];
 
 #[derive(Clone, Debug, Encode, Decode)]
 pub enum ProcMsg {
@@ -44,23 +43,31 @@ pub enum QueryMsg {
         #[n(0)]
         addr: Address,
     },
+    #[n(3)]
+    TotalSupply,
 }
 
 #[derive(Clone, Debug, Encode, Decode)]
 pub enum QueryRsp {
     #[n(0)]
-    NameRsp {
+    Name {
         #[n(0)]
         res: String,
     },
     #[n(1)]
-    SymbolRsp {
+    Symbol {
         #[n(1)]
         res: String,
     },
     #[n(2)]
-    BalanceRsp {
+    Balance {
         #[n(2)]
         res: i64,
     },
+    #[n(3)]
+    TotalSupply {
+        #[n(2)]
+        res: i64,
+    },
+    
 }
