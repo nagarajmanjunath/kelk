@@ -23,8 +23,8 @@ fn compute_hash<K: Hash>(key: &K) -> u32 {
 /// The instance of `StorageHashTable`
 pub struct StorageHashTable<'a, K, V>
 where
-    K: Codec + Ord + Hash + Eq,
-    V: Codec,
+    K: Codec + Clone + Ord + Hash + Eq,
+    V: Codec + Clone,
 {
     storage: &'a Storage,
     // Offset of the header in the storage file.
@@ -37,8 +37,8 @@ where
 
 impl<'a, K, V> StorageHashTable<'a, K, V>
 where
-    K: Codec + Ord + Hash + Eq,
-    V: Codec,
+    K: Codec + Clone + Ord + Hash + Eq,
+    V: Codec + Clone,
 {
     /// Creates a new instance of `StorageHashTable`.
     pub fn create(storage: &'a Storage, table_size: u32) -> Result<Self, Error> {

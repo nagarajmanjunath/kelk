@@ -11,6 +11,7 @@ use self::node::Node;
 use crate::storage::codec::Codec;
 use crate::storage::error::Error;
 use crate::storage::{Offset, Storage};
+use core::cmp::Ordering;
 use core::marker::PhantomData;
 use core::result::Result;
 
@@ -31,8 +32,8 @@ where
 
 impl<'a, K, V> StorageBST<'a, K, V>
 where
-    K: Codec + Ord,
-    V: Codec,
+    K: Codec + Clone + Ord,
+    V: Codec + Clone,
 {
     /// Creates a new instance of `StorageBST`.
     pub fn create(storage: &'a Storage) -> Result<Self, Error> {
@@ -81,9 +82,106 @@ where
         self.len() == 0
     }
 
+    /// Removes a key from the `StorageBST`, returning the value at the key
+    /// if the key was previously in the `StorageBST`.
+    pub fn remove(&mut self, key: &K) -> Result<Option<V>, Error> {
+        if self.header.items == 0 {
+            return Ok(None);
+        }
+
+        let mut offset = self.header.root_offset;
+        let mut node_parent_info: Option<(Offset, Node<K, V>)> = None;
+        let mut is_right = false;
+
+        while offset != 0 {
+            let mut node: Node<K, V> = self.storage.read(offset)?;
+
+            match key.cmp(&node.key) {
+                Ordering::Less => {
+                    node_parent_info = Some((offset, node.clone()));
+                    offset = node.left;
+                    is_right = false;
+                }
+                Ordering::Greater => {
+                    node_parent_info = Some((offset, node.clone()));
+                    offset = node.right;
+                    is_right = true;
+                }
+                Ordering::Equal => {
+                    let result = node.value.clone();
+                    match (node.left, node.right) {
+                        // The node has no children or only one child
+                        (0, 0) | (_, 0) | (0, _) => {
+                            match &mut node_parent_info {
+                                Some((offset, parent)) => {
+                                    // updating the parent node
+                                    if is_right {
+                                        parent.right = 0;
+                                    } else {
+                                        parent.left = 0;
+                                    }
+                                    self.storage.write(*offset, parent)?;
+                                }
+                                None => {
+                                    if node.left != 0 {
+                                        self.header.root_offset = node.left;
+                                    } else if node.right != 0 {
+                                        self.header.root_offset = node.right;
+                                    } else {
+                                        self.header.root_offset = 0
+                                    }
+                                } //
+                                  // TODO: deallocate item here
+                                  //
+                            }
+                        }
+                        // The most complexity case: replace the value of the current node with
+                        // its successor and then remove the successor's node.
+                        (_, _) => {
+                            let mut successor_parent_info: Option<(Offset, Node<K, V>)> = None;
+                            let mut successor_node_offset = node.right;
+                            let mut successor_node: Node<K, V> =
+                                self.storage.read(successor_node_offset)?;
+
+                            // Get the inorder successor (smallest in the right subtree)
+                            while !successor_node.left.eq(&0) {
+                                successor_parent_info =
+                                    Some((successor_node_offset, successor_node.clone()));
+
+                                successor_node_offset = successor_node.left;
+                                successor_node = self.storage.read(successor_node_offset)?;
+                            }
+
+                            match &mut successor_parent_info {
+                                Some((offset, parent)) => {
+                                    parent.left = 0;
+                                    self.storage.write(*offset, parent)?;
+                                }
+                                None => {
+                                    node.right = successor_node.right;
+                                }
+                            }
+
+                            node.key = successor_node.key;
+                            node.value = successor_node.value;
+                            self.storage.write(offset, &node)?;
+                        }
+                    }
+
+                    self.header.items -= 1;
+                    self.storage.write(self.header_offset, &self.header)?;
+
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Inserts a key-value pair into the tree.
-    /// If the map did not have this key present, None is returned.
-    /// If the map did have this key present, the value is updated, and the old value is returned.
+    /// If the `StorageBST` did not have this key present, None is returned.
+    /// If the `StorageBST` did have this key present, the value is updated, and the old value is returned.
     pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, Error> {
         if self.header.items == 0 {
             // create a root node
@@ -101,56 +199,62 @@ where
             let mut node: Node<K, V> = self.storage.read(offset)?;
 
             loop {
-                if node.key.eq(&key) {
-                    let old_value = node.value;
-                    node.value = value;
+                match key.cmp(&node.key) {
+                    Ordering::Less => {
+                        if node.left.eq(&0) {
+                            let new_offset = self.storage.allocate(Node::<K, V>::PACKED_LEN)?;
+                            let new_node = Node::new(key, value);
 
-                    // node exists, update value
-                    self.storage.write(offset, &node)?;
-                    return Ok(Some(old_value));
-                } else if node.key.le(&key) {
-                    if node.left.eq(&0) {
-                        let new_offset = self.storage.allocate(Node::<K, V>::PACKED_LEN)?;
-                        let new_node = Node::new(key, value);
+                            // update header
+                            self.header.items += 1;
+                            self.storage.write(self.header_offset, &self.header)?;
 
-                        // update header
-                        self.header.items += 1;
-                        self.storage.write(self.header_offset, &self.header)?;
+                            // update parent node
+                            node.left = new_offset;
+                            self.storage.write(offset, &node)?;
 
-                        // update parent node
-                        node.left = new_offset;
-                        self.storage.write(offset, &node)?;
-
-                        // write new node
-                        self.storage.write(new_offset, &new_node)?;
-                        return Ok(None);
+                            // write new node
+                            self.storage.write(new_offset, &new_node)?;
+                            return Ok(None);
+                        }
+                        offset = node.left;
                     }
-                    offset = node.left;
-                } else {
-                    if node.right.eq(&0) {
-                        let new_offset = self.storage.allocate(Node::<K, V>::PACKED_LEN)?;
-                        let new_node = Node::new(key, value);
+                    Ordering::Greater => {
+                        if node.right.eq(&0) {
+                            let new_offset = self.storage.allocate(Node::<K, V>::PACKED_LEN)?;
+                            let new_node = Node::new(key, value);
 
-                        // update header
-                        self.header.items += 1;
-                        self.storage.write(self.header_offset, &self.header)?;
+                            // update header
+                            self.header.items += 1;
+                            self.storage.write(self.header_offset, &self.header)?;
 
-                        // update parent node
-                        node.right = new_offset;
-                        self.storage.write(offset, &node)?;
+                            // update parent node
+                            node.right = new_offset;
+                            self.storage.write(offset, &node)?;
 
-                        // write new node
-                        self.storage.write(new_offset, &new_node)?;
-                        return Ok(None);
+                            // write new node
+                            self.storage.write(new_offset, &new_node)?;
+                            return Ok(None);
+                        }
+                        offset = node.right;
                     }
-                    offset = node.right;
+
+                    Ordering::Equal => {
+                        let old_value = node.value;
+                        node.value = value;
+
+                        // node exists, update value
+                        self.storage.write(offset, &node)?;
+                        return Ok(Some(old_value));
+                    }
                 }
                 node = self.storage.read(offset)?;
             }
         }
     }
 
-    /// Returns the value corresponding to the key. If the key doesn't exists, it returns None.
+    /// Finds the value corresponding to the key in the `StorageBST` .
+    /// If the key is found, the value is returned. If the key is not found, `None` is returned.
     pub fn find(&self, key: &K) -> Result<Option<V>, Error> {
         if self.header.items == 0 {
             return Ok(None);
@@ -160,18 +264,22 @@ where
         let mut node: Node<K, V> = self.storage.read(offset)?;
 
         loop {
-            if node.key.eq(key) {
-                return Ok(Some(node.value));
-            } else if node.key.le(key) {
-                if node.left.eq(&0) {
-                    return Ok(None);
+            match key.cmp(&node.key) {
+                Ordering::Less => {
+                    if node.left.eq(&0) {
+                        return Ok(None);
+                    }
+                    offset = node.left;
                 }
-                offset = node.left;
-            } else {
-                if node.right.eq(&0) {
-                    return Ok(None);
+                Ordering::Greater => {
+                    if node.right.eq(&0) {
+                        return Ok(None);
+                    }
+                    offset = node.right;
                 }
-                offset = node.right;
+                Ordering::Equal => {
+                    return Ok(Some(node.value));
+                }
             }
             node = self.storage.read(offset)?;
         }
@@ -189,7 +297,7 @@ mod tests {
     use crate::storage::mock::mock_storage;
 
     #[test]
-    fn test_bst() {
+    fn test_insert_find() {
         let storage = mock_storage(1024);
         let mut bst_1 = StorageBST::<i32, i64>::create(&storage).unwrap();
 
@@ -205,8 +313,46 @@ mod tests {
         assert_eq!(None, bst_2.find(&4).unwrap());
         assert_eq!(Some(30), bst_2.find(&3).unwrap());
         assert_eq!(Some(100), bst_2.find(&1).unwrap());
-        assert!(!bst_2.contains_key(&-1).unwrap());
-        assert!(bst_2.contains_key(&2).unwrap());
-        assert!(!bst_2.contains_key(&4).unwrap());
+
+        let bst_3 = StorageBST::<i32, i64>::load(&storage, bst_2.offset()).unwrap();
+        assert!(!bst_3.contains_key(&-1).unwrap());
+        assert!(bst_3.contains_key(&2).unwrap());
+        assert!(!bst_3.contains_key(&4).unwrap());
     }
+
+    #[test]
+    fn test_remove() {
+        let storage = mock_storage(1024);
+        let mut bst_1 = StorageBST::<i32, i64>::create(&storage).unwrap();
+
+        // remove from the empty bst
+        assert_eq!(None, bst_1.remove(&1).unwrap());
+
+        // insert some key-value pairs
+        assert_eq!(None, bst_1.insert(15, 15).unwrap());
+        assert_eq!(None, bst_1.insert(10, 10).unwrap());
+        assert_eq!(None, bst_1.insert(20, 20).unwrap());
+        assert_eq!(None, bst_1.insert(25, 25).unwrap());
+        assert_eq!(None, bst_1.insert(18, 18).unwrap());
+
+        // deleting a node with two children
+        assert_eq!(Some(15), bst_1.remove(&15).unwrap());
+        assert_eq!(None, bst_1.find(&15).unwrap());
+
+        // remove a key-value pair that doesn't exist
+        assert_eq!(None, bst_1.remove(&0).unwrap());
+        assert_eq!(4, bst_1.len());
+
+        // remove all key-value pairs
+        assert_eq!(Some(18), bst_1.remove(&18).unwrap());
+        assert_eq!(Some(25), bst_1.remove(&25).unwrap());
+        assert_eq!(Some(20), bst_1.remove(&20).unwrap());
+        assert_eq!(Some(10), bst_1.remove(&10).unwrap());
+
+        let bst_2 = StorageBST::<i32, i64>::load(&storage, bst_1.offset()).unwrap();
+        assert_eq!(0, bst_2.len());
+        assert!(bst_2.is_empty());
+    }
+
+    // TODO: write property test for me
 }

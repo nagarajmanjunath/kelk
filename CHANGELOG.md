@@ -2,6 +2,8 @@
 
 ## Version 0.4.0
 
+- Adding `remove` method for `StorageBST`
+
 ## Version 0.3.0
 
 - Introducing `Context` and `OwnedContext` structs for dependency injection at runtime
