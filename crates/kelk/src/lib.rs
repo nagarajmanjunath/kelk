@@ -17,7 +17,6 @@
     unused_comparisons,
     unused_parens,
     while_true,
-    trivial_casts,
     trivial_numeric_casts
 )]
 

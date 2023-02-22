@@ -26,15 +26,16 @@ macro_rules! impl_codec_for_integer {
             fn to_bytes(&self, bytes: &mut [u8]) {
                 debug_assert_eq!(bytes.len(), Self::PACKED_LEN as usize);
 
-                bytes.copy_from_slice(&self.to_be_bytes());
+                unsafe {
+                    *(bytes.as_mut_ptr() as *mut $type) = *self;
+                }
             }
 
             #[inline]
             fn from_bytes(bytes: &[u8]) -> Self {
                 debug_assert_eq!(bytes.len(), Self::PACKED_LEN as usize);
 
-                let arr = bytes.try_into().expect("invalid data");
-                Self::from_be_bytes(arr)
+                unsafe { *(bytes.as_ptr() as *const $type) }
             }
         }
     };
@@ -49,7 +50,11 @@ macro_rules! impl_codec_for_array {
             fn to_bytes(&self, bytes: &mut [u8]) {
                 debug_assert_eq!(bytes.len(), Self::PACKED_LEN as usize);
 
-                bytes.copy_from_slice(self);
+                let src = self as *const $type as *const u8;
+                let dst = bytes.as_mut_ptr();
+                unsafe {
+                    core::ptr::copy_nonoverlapping(src, dst, Self::PACKED_LEN as usize);
+                }
             }
 
             #[inline]
@@ -57,7 +62,11 @@ macro_rules! impl_codec_for_array {
                 debug_assert_eq!(bytes.len(), Self::PACKED_LEN as usize);
 
                 let mut arr = [0; Self::PACKED_LEN as usize];
-                arr.copy_from_slice(bytes);
+                let src = bytes.as_ptr();
+                let dst = arr.as_mut_ptr();
+                unsafe {
+                    core::ptr::copy_nonoverlapping(src, dst, Self::PACKED_LEN as usize);
+                }
                 arr
             }
         }

@@ -2,6 +2,7 @@
 
 ## Version 0.4.0
 
+- Improved the performance of the `Codec` by implementing zero-copy conversion for `from_bytes` and `to_bytes` functions.
 - Adding `remove` method for `StorageBST`
 
 ## Version 0.3.0
